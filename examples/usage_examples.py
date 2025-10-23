@@ -65,7 +65,8 @@ def example_add_leads_programmatically():
                 session.add(lead)
                 print(f"Added lead: {lead_data['first_name']} {lead_data['last_name']}")
             else:
-                print(f"Lead already exists: {lead_data['phone_number']}")
+                # Don't log sensitive phone number in examples
+                print(f"Lead already exists: {lead_data['first_name']} {lead_data['last_name']}")
     
     db.close()
 

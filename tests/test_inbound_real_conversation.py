@@ -2,6 +2,11 @@
 """
 Lightweight Test Server for Inbound Agent Manual Testing
 
+⚠️ SECURITY NOTE: This is a TEST/DEVELOPMENT tool for LOCAL use only.
+It logs conversation details (including potentially sensitive test data) to help
+developers understand conversation flow. DO NOT use in production or with real
+customer data. DO NOT expose to external networks.
+
 This script provides a simple WebSocket server that simulates an inbound AI agent
 for manual testing without requiring Asterisk, OpenAI, or other infrastructure.
 
@@ -309,6 +314,10 @@ class TestInboundServer:
             logger.error(f"❌ Error handling client {client_id}: {e}")
         finally:
             # Log conversation summary
+            # NOTE: This is a TEST tool for LOCAL development only.
+            # In production, avoid logging potentially sensitive information like
+            # fraud types or appointment dates. This logging is intentional here
+            # to help developers understand the conversation flow during testing.
             summary = agent.get_conversation_summary()
             logger.info(f"📊 Conversation summary for {client_id}:")
             logger.info(f"   - State: {summary['state']}")

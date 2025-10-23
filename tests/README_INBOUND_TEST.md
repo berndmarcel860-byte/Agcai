@@ -1,5 +1,7 @@
 # Testing the Inbound Agent - Manual Testing Guide
 
+⚠️ **IMPORTANT**: This is a test/development tool for LOCAL use only. It logs conversation details to help developers understand the conversation flow. Do not use with real customer data or expose to external networks.
+
 This guide explains how to manually test the inbound AI agent using the lightweight test server.
 
 ## Overview

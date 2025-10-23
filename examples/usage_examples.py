@@ -180,7 +180,9 @@ def example_custom_campaign():
     
     conversation_engine = ConversationEngine(
         api_key=config.openai.api_key,
-        model=config.openai.model
+        model=config.openai.model,
+        http_proxy=config.openai.http_proxy,
+        https_proxy=config.openai.https_proxy
     )
     
     tts = TextToSpeech(

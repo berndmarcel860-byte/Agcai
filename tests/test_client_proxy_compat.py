@@ -9,18 +9,11 @@ handles both cases gracefully.
 import os
 import sys
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, Mock
 from typing import Optional
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
-try:
-    from ai.conversation import safe_openai_client_factory
-except ImportError:
-    print("Error: Could not import safe_openai_client_factory")
-    print("Make sure the src/ai/conversation.py file exists and is properly configured")
-    sys.exit(1)
 
 
 class MockOpenAIClient:
@@ -36,6 +29,21 @@ class MockOpenAIClientWithProxies:
         self.api_key = api_key
         self.proxies = proxies
         self.chat = MagicMock()
+
+
+# Mock the openai module before importing
+sys.modules['openai'] = Mock()
+sys.modules['openai'].OpenAI = MockOpenAIClient
+sys.modules['loguru'] = Mock()
+sys.modules['loguru'].logger = Mock()
+
+# Now we can import the function
+try:
+    from ai.conversation import safe_openai_client_factory
+except ImportError as e:
+    print(f"Error: Could not import safe_openai_client_factory: {e}")
+    print("Make sure the src/ai/conversation.py file exists and is properly configured")
+    sys.exit(1)
 
 
 class TestClientProxyCompat(unittest.TestCase):

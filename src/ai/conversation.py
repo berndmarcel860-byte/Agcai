@@ -1,5 +1,12 @@
 """
 AI Conversation Engine using OpenAI
+
+Changelog:
+- 2025-10-23: Added safe_openai_client_factory to handle proxy parameter compatibility.
+  This fixes the issue where test_inbound_agent.py would fail with "Client.__init__() 
+  got an unexpected keyword argument 'proxies'" when the OpenAI client version doesn't 
+  support the proxies parameter. The factory function now gracefully falls back to 
+  setting HTTP_PROXY/HTTPS_PROXY environment variables when needed.
 """
 import os
 import inspect

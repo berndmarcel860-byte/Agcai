@@ -83,7 +83,9 @@ class InboundTestAgent:
             logger.info("Initializing AI conversation engine...")
             self.conversation_engine = ConversationEngine(
                 api_key=self.config.openai.api_key,
-                model=self.config.openai.model
+                model=self.config.openai.model,
+                http_proxy=self.config.openai.http_proxy,
+                https_proxy=self.config.openai.https_proxy
             )
             
             # Initialize TTS

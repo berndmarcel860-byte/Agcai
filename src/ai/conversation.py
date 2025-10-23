@@ -1,26 +1,118 @@
 """
 AI Conversation Engine using OpenAI
 """
+import os
+import inspect
 from openai import OpenAI
 from loguru import logger
 from typing import List, Dict, Optional
 import json
 
 
+def safe_openai_client_factory(api_key: str, http_proxy: str = None, https_proxy: str = None) -> OpenAI:
+    """
+    Safely create an OpenAI client with proxy support.
+    
+    This factory function handles cases where the OpenAI Client constructor
+    may not support the 'proxies' parameter in older versions. It will:
+    1. Try to create client with proxies if supported
+    2. Fall back to creating client without proxies and set environment variables
+    3. Log warnings when proxies cannot be passed directly
+    
+    Args:
+        api_key: OpenAI API key
+        http_proxy: HTTP proxy URL (e.g., "http://proxy.example.com:8080")
+        https_proxy: HTTPS proxy URL (e.g., "http://proxy.example.com:8080")
+        
+    Returns:
+        Initialized OpenAI client
+    """
+    # Prepare proxy configuration
+    proxies = None
+    if http_proxy or https_proxy:
+        proxies = {}
+        if http_proxy:
+            proxies['http'] = http_proxy
+        if https_proxy:
+            proxies['https'] = https_proxy
+    
+    # First, check if Client constructor supports 'proxies' parameter
+    client_sig = inspect.signature(OpenAI.__init__)
+    supports_proxies = 'proxies' in client_sig.parameters
+    
+    if proxies:
+        if supports_proxies:
+            # Try to create client with proxies parameter
+            try:
+                logger.info("Creating OpenAI client with proxy configuration")
+                client = OpenAI(api_key=api_key, proxies=proxies)
+                logger.info("✅ OpenAI client created successfully with proxies")
+                return client
+            except TypeError as e:
+                if 'proxies' in str(e):
+                    logger.warning(f"OpenAI client does not support 'proxies' parameter: {e}")
+                    logger.warning("Falling back to environment variable proxy configuration")
+                else:
+                    raise
+        else:
+            logger.warning("OpenAI client constructor does not support 'proxies' parameter")
+            logger.info("Setting HTTP_PROXY and HTTPS_PROXY environment variables instead")
+        
+        # Fallback: Set environment variables for proxy
+        if http_proxy:
+            os.environ['HTTP_PROXY'] = http_proxy
+            os.environ['http_proxy'] = http_proxy
+            logger.info(f"Set HTTP_PROXY environment variable: {http_proxy}")
+        
+        if https_proxy:
+            os.environ['HTTPS_PROXY'] = https_proxy
+            os.environ['https_proxy'] = https_proxy
+            logger.info(f"Set HTTPS_PROXY environment variable: {https_proxy}")
+        
+        # Create client without proxies parameter
+        try:
+            client = OpenAI(api_key=api_key)
+            logger.info("✅ OpenAI client created successfully (using environment proxy variables)")
+            return client
+        except Exception as e:
+            logger.error(f"Failed to create OpenAI client: {e}")
+            raise
+    else:
+        # No proxies configured, create client normally
+        try:
+            client = OpenAI(api_key=api_key)
+            logger.debug("OpenAI client created successfully without proxy configuration")
+            return client
+        except Exception as e:
+            logger.error(f"Failed to create OpenAI client: {e}")
+            raise
+
+
 class ConversationEngine:
     """AI conversation engine for handling call dialogues"""
     
-    def __init__(self, api_key: str, model: str = "gpt-4-turbo-preview"):
+    def __init__(self, api_key: str, model: str = "gpt-4-turbo-preview", 
+                 http_proxy: str = None, https_proxy: str = None):
         """
         Initialize OpenAI conversation engine
         
         Args:
             api_key: OpenAI API key
             model: OpenAI model to use
+            http_proxy: Optional HTTP proxy URL
+            https_proxy: Optional HTTPS proxy URL
         """
         self.api_key = api_key
         self.model = model
-        self.client = OpenAI(api_key=api_key)
+        self.http_proxy = http_proxy
+        self.https_proxy = https_proxy
+        
+        # Use safe factory to create client with proxy support
+        self.client = safe_openai_client_factory(
+            api_key=api_key,
+            http_proxy=http_proxy,
+            https_proxy=https_proxy
+        )
         self.system_prompt = self._get_fund_recovery_prompt()
         
     def _get_fund_recovery_prompt(self) -> str:

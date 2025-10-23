@@ -36,6 +36,8 @@ class OpenAIConfig:
     """OpenAI configuration"""
     api_key: str
     model: str = "gpt-4-turbo-preview"
+    http_proxy: str = None
+    https_proxy: str = None
 
 
 @dataclass
@@ -95,7 +97,9 @@ class Config:
         # OpenAI configuration
         self.openai = OpenAIConfig(
             api_key=os.getenv("OPENAI_API_KEY", ""),
-            model=os.getenv("OPENAI_MODEL", "gpt-4-turbo-preview")
+            model=os.getenv("OPENAI_MODEL", "gpt-4-turbo-preview"),
+            http_proxy=os.getenv("OPENAI_HTTP_PROXY"),
+            https_proxy=os.getenv("OPENAI_HTTPS_PROXY")
         )
         
         # TTS configuration

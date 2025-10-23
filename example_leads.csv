@@ -1,0 +1,4 @@
+phone_number,first_name,last_name,email,company
++491234567890,Max,Mustermann,max@example.com,Example GmbH
++491234567891,Anna,Schmidt,anna@example.com,Test AG
++491234567892,Peter,Mueller,peter@example.com,Demo Ltd

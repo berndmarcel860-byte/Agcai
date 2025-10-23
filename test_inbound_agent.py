@@ -5,6 +5,10 @@ Manual Test Script for AI Call Agent
 This script allows you to test the AI agent by calling extension 5000 from extension 1000.
 It handles inbound calls through ARI's Stasis application for interactive testing.
 
+For calls from extensions 1000-5000, the agent now operates in full-duplex mode,
+allowing bidirectional conversation where the caller can speak and the agent responds.
+For other extensions, it falls back to TTS-only mode.
+
 Usage:
     python test_inbound_agent.py
 
@@ -28,12 +32,13 @@ from ai import ConversationEngine
 from tts import TextToSpeech
 from stt import SpeechToText
 from utils import setup_logging
+from telephony import TelephonyConfig, FullDuplexHandler
 
 from loguru import logger
 
 
 class InboundTestAgent:
-    """Test agent for handling inbound calls to extension 5000"""
+    """Test agent for handling inbound calls to extension 5000 with full-duplex support"""
     
     def __init__(self):
         """Initialize the test agent"""
@@ -56,6 +61,10 @@ class InboundTestAgent:
         self.conversation_engine = None
         self.tts = None
         self.stt = None
+        
+        # Initialize telephony configuration and full-duplex handler
+        self.telephony_config = None
+        self.full_duplex_handler = None
         
         # Track active calls
         self.active_calls = {}
@@ -102,8 +111,23 @@ class InboundTestAgent:
             )
             self.stt.load_model()
             
+            # Initialize telephony configuration
+            logger.info("Loading telephony configuration...")
+            self.telephony_config = TelephonyConfig()
+            
+            # Initialize full-duplex handler
+            logger.info("Initializing full-duplex handler...")
+            self.full_duplex_handler = FullDuplexHandler(
+                stt_engine=self.stt,
+                tts_engine=self.tts,
+                conversation_engine=self.conversation_engine,
+                ari_client=self.ari_client,
+                config=self.telephony_config
+            )
+            
             logger.info("✅ All components initialized successfully!")
             logger.info("📞 Agent ready to receive calls on extension 5000")
+            logger.info("🔄 Full-duplex mode enabled for extensions 1000-5000")
             
         except Exception as e:
             logger.error(f"Failed to initialize agent: {e}")
@@ -209,42 +233,15 @@ class InboundTestAgent:
             self.ari_client.start_recording(channel_id, recording_name)
             logger.info(f"🎙️ Recording started: {recording_name}")
             
-            # Greet the caller
-            greeting = self.conversation_engine.get_response(
-                conversation_history,
-                "Beginne das Gespräch mit einer freundlichen Begrüßung für einen Testanruf."
+            # Route call through full-duplex handler
+            # This will automatically handle full-duplex mode for extensions 1000-5000
+            # and fall back to TTS-only mode for other extensions
+            self.full_duplex_handler.route_call(
+                channel_id,
+                caller_number,
+                conversation_history
             )
             
-            if greeting:
-                self.speak(channel_id, greeting, conversation_history)
-                
-                # For testing, have a simple back-and-forth conversation
-                # In real scenario, you'd wait for customer speech input
-                logger.info("💬 Conversation started. Agent is ready to respond.")
-                logger.info("ℹ️  In production, the agent would now listen for customer speech.")
-                logger.info("ℹ️  For this test, the agent will provide a few sample responses.")
-                
-                # Simulate conversation flow (in production, this would be driven by STT)
-                time.sleep(3)
-                
-                # Sample question
-                question = "Können Sie mir mehr über Ihre Dienstleistungen erzählen?"
-                logger.info(f"📝 [Simulated customer]: {question}")
-                conversation_history.append({"role": "user", "content": question})
-                
-                response = self.conversation_engine.get_response(conversation_history, question)
-                if response:
-                    self.speak(channel_id, response, conversation_history)
-                    
-                time.sleep(3)
-                
-                # Closing
-                closing = "Vielen Dank für Ihren Testanruf. Das System funktioniert einwandfrei. Auf Wiederhören!"
-                logger.info(f"Agent says: {closing}")
-                self.speak(channel_id, closing, conversation_history)
-                
-                time.sleep(2)
-                
             # End the call
             logger.info("📴 Ending test call")
             self.ari_client.hangup_channel(channel_id)
@@ -297,16 +294,20 @@ class InboundTestAgent:
         self.running = True
         
         logger.info("=" * 60)
-        logger.info("🤖 AI Call Agent Test Mode")
+        logger.info("🤖 AI Call Agent Test Mode - Full-Duplex Enabled")
         logger.info("=" * 60)
         logger.info("")
-        logger.info("📞 Call extension 5000 from extension 1000 to test the agent")
+        logger.info("📞 Call extension 5000 from extension 1000-5000 for full-duplex mode")
+        logger.info("   (Real bidirectional conversation with STT/TTS)")
+        logger.info("")
+        logger.info("📞 Call from other extensions will use TTS-only mode")
         logger.info("")
         logger.info("Configuration:")
         logger.info(f"  - ARI App: {self.config.ari.app}")
         logger.info(f"  - ARI Host: {self.config.ari.host}:{self.config.ari.port}")
         logger.info(f"  - Sounds Dir: {self.sounds_dir}")
         logger.info(f"  - Recordings Dir: {self.recordings_dir}")
+        logger.info(f"  - Full-Duplex Range: 1000-5000")
         logger.info("")
         logger.info("Press Ctrl+C to stop")
         logger.info("=" * 60)

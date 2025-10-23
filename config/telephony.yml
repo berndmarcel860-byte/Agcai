@@ -1,0 +1,86 @@
+# Telephony Configuration for Full-Duplex Inbound Calls
+# This configuration file defines settings for the bidirectional call handling system
+
+# Speech-to-Text Configuration
+stt:
+  # Provider: whisper (local), google, or openai
+  provider: whisper
+  
+  # API Key (required for cloud providers)
+  api_key: ${STT_API_KEY:-}
+  
+  # Model configuration (provider-specific)
+  model: base  # For Whisper: tiny, base, small, medium, large
+  
+  # Language
+  language: de
+  
+  # Device: cpu or cuda
+  device: cpu
+  
+  # Streaming configuration
+  stream:
+    enabled: true
+    chunk_duration_ms: 1000  # Duration of audio chunks in milliseconds
+    silence_threshold: 500    # Silence duration in ms to consider end of speech
+
+# Text-to-Speech Configuration
+tts:
+  # Provider: coqui (local), polly (AWS), google, or openai
+  provider: coqui
+  
+  # API Key (required for cloud providers)
+  api_key: ${TTS_API_KEY:-}
+  
+  # Model configuration (provider-specific)
+  model: tts_models/de/thorsten/tacotron2-DDC  # For Coqui TTS
+  
+  # Language
+  language: de
+  
+  # Voice settings (provider-specific)
+  voice: ${TTS_VOICE:-Marlene}  # For AWS Polly
+  
+  # Audio format
+  sample_rate: 8000
+  channels: 1
+
+# Agent Configuration
+agent:
+  # Endpoint for agent logic (optional, uses built-in if not specified)
+  endpoint: ${AGENT_ENDPOINT:-}
+  
+  # Model for conversation
+  model: gpt-4-turbo-preview
+  
+  # Maximum conversation duration (seconds)
+  max_duration: 300
+  
+  # Response timeout (seconds)
+  response_timeout: 30
+
+# Extension Range for Full-Duplex Mode
+full_duplex:
+  # Enable full-duplex mode for calls from these extensions
+  enabled: true
+  
+  # Extension range (inclusive)
+  min_extension: 1000
+  max_extension: 5000
+  
+  # Fallback to TTS-only for extensions outside this range
+  fallback_mode: tts_only
+  
+  # Enable real-time streaming (lower latency but higher resource usage)
+  realtime_streaming: false
+
+# Logging
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  level: INFO
+  
+  # Log call transcripts
+  log_transcripts: true
+  
+  # Log directory
+  directory: logs/telephony

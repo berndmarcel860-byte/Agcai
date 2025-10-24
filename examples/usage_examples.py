@@ -185,12 +185,14 @@ def example_custom_campaign():
     
     tts = TextToSpeech(
         model_name=config.tts.model,
-        language=config.tts.language
+        language=config.tts.language,
+        use_gpu=config.tts.use_gpu
     )
     
     stt = SpeechToText(
         model_size=config.stt.model,
-        language=config.stt.language
+        language=config.stt.language,
+        device=config.stt.device
     )
     
     # Create campaign manager

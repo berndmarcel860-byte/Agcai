@@ -83,7 +83,8 @@ class AICallAgent:
             logger.info("Loading TTS model...")
             self.tts = TextToSpeech(
                 model_name=self.config.tts.model,
-                language=self.config.tts.language
+                language=self.config.tts.language,
+                use_gpu=self.config.tts.use_gpu
             )
             self.tts.load_model()
             
@@ -91,7 +92,8 @@ class AICallAgent:
             logger.info("Loading STT model...")
             self.stt = SpeechToText(
                 model_size=self.config.stt.model,
-                language=self.config.stt.language
+                language=self.config.stt.language,
+                device=self.config.stt.device
             )
             self.stt.load_model()
             

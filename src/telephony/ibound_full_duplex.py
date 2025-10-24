@@ -69,7 +69,7 @@ class TelephonyConfig:
                 'provider': 'whisper',
                 'model': 'base',
                 'language': 'de',
-                'device': 'cpu',
+                'device': 'cuda',  # Use GPU (NVIDIA 3060 Ti) for faster transcription
                 'stream': {
                     'enabled': True,
                     'chunk_duration_ms': 1000,
@@ -81,7 +81,8 @@ class TelephonyConfig:
                 'model': 'tts_models/de/thorsten/tacotron2-DDC',
                 'language': 'de',
                 'sample_rate': 8000,
-                'channels': 1
+                'channels': 1,
+                'use_gpu': True  # Use GPU (NVIDIA 3060 Ti) for faster synthesis
             },
             'agent': {
                 'model': 'gpt-4-turbo-preview',

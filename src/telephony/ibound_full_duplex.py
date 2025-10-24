@@ -69,7 +69,7 @@ class TelephonyConfig:
                 'provider': 'whisper',
                 'model': 'base',
                 'language': 'de',
-                'device': 'cpu',
+                'device': 'cuda',  # Use GPU (NVIDIA 3060 Ti) for faster transcription
                 'stream': {
                     'enabled': True,
                     'chunk_duration_ms': 1000,
@@ -81,7 +81,8 @@ class TelephonyConfig:
                 'model': 'tts_models/de/thorsten/tacotron2-DDC',
                 'language': 'de',
                 'sample_rate': 8000,
-                'channels': 1
+                'channels': 1,
+                'use_gpu': True  # Use GPU (NVIDIA 3060 Ti) for faster synthesis
             },
             'agent': {
                 'model': 'gpt-4-turbo-preview',
@@ -312,8 +313,18 @@ class FullDuplexHandler:
             # In production, this should be event-driven or use streaming
             time.sleep(timeout)
             
-            # Stop recording
-            self.ari_client.stop_recording(channel_id, recording_name)
+            # Check if channel still exists before stopping recording
+            channel_state = self.ari_client.get_channel_state(channel_id)
+            if not channel_state:
+                logger.warning(f"Channel {channel_id} no longer exists, caller may have hung up")
+                return None
+            
+            # Stop recording (only pass recording_name, not channel_id)
+            try:
+                self.ari_client.stop_recording(recording_name)
+            except Exception as e:
+                logger.warning(f"Failed to stop recording {recording_name}: {e}")
+                # Continue gracefully - the recording may have already stopped
             
             # Wait a bit for file to be written
             time.sleep(0.5)
@@ -377,13 +388,30 @@ class FullDuplexHandler:
                 
                 # Start recording for this turn
                 recording_name = f"dialog_{channel_id}_{int(time.time())}_{turn}"
-                self.ari_client.start_recording(channel_id, recording_name)
+                recording = self.ari_client.start_recording(channel_id, recording_name)
+                
+                # Check if recording started successfully
+                if not recording:
+                    logger.warning(f"Failed to start recording on turn {turn}")
+                    # Check if channel still exists
+                    channel_state = self.ari_client.get_channel_state(channel_id)
+                    if not channel_state:
+                        logger.info(f"Channel {channel_id} no longer exists, caller hung up during recording start")
+                        break
+                    # Skip this turn if recording failed but channel is still alive
+                    continue
                 
                 # Listen and transcribe caller's speech
                 user_input = self.listen_and_transcribe(channel_id, recording_name, timeout=8)
                 
                 if not user_input:
-                    # No input detected, ask if they're still there
+                    # No input detected - check if channel is still alive
+                    channel_state = self.ari_client.get_channel_state(channel_id)
+                    if not channel_state:
+                        logger.info(f"Channel {channel_id} ended during listening, caller hung up")
+                        break
+                    
+                    # Channel is alive but no input - ask if they're still there
                     if turn > 1:  # Give some grace on first turn
                         prompt = "Sind Sie noch da? Können Sie mich hören?"
                         self.speak_to_caller(channel_id, prompt, conversation_history)

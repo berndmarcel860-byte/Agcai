@@ -66,14 +66,16 @@ class TestFullDuplexHandler(unittest.TestCase):
         self.mock_config = Mock()
         self.mock_config.get = Mock(side_effect=self._mock_config_get)
         
-        # Create handler
-        self.handler = FullDuplexHandler(
-            stt_engine=self.mock_stt,
-            tts_engine=self.mock_tts,
-            conversation_engine=self.mock_conversation,
-            ari_client=self.mock_ari,
-            config=self.mock_config
-        )
+        # Mock directory creation to avoid permission errors in tests
+        with patch('os.makedirs'):
+            # Create handler
+            self.handler = FullDuplexHandler(
+                stt_engine=self.mock_stt,
+                tts_engine=self.mock_tts,
+                conversation_engine=self.mock_conversation,
+                ari_client=self.mock_ari,
+                config=self.mock_config
+            )
         
     def _mock_config_get(self, key, default=None):
         """Mock configuration values"""
@@ -206,6 +208,78 @@ class TestFullDuplexHandler(unittest.TestCase):
         self.assertFalse(result)
         self.assertEqual(len(conversation_history), 0)
         
+    def test_listen_and_transcribe_correct_stop_recording_signature(self):
+        """Test that stop_recording is called with only recording_name (not channel_id)"""
+        # Setup mocks
+        self.mock_ari.get_channel_state = Mock(return_value={'id': 'channel-123', 'state': 'Up'})
+        self.mock_ari.stop_recording = Mock(return_value=True)
+        self.mock_stt.transcribe_file = Mock(return_value="Test transcription")
+        
+        with patch('os.path.exists', return_value=True):
+            with patch('time.sleep'):
+                result = self.handler.listen_and_transcribe(
+                    'channel-123',
+                    'test_recording',
+                    timeout=1
+                )
+                
+                # Verify stop_recording was called with only recording_name
+                self.mock_ari.stop_recording.assert_called_once_with('test_recording')
+                self.assertEqual(result, "Test transcription")
+                
+    def test_listen_and_transcribe_channel_hangup_detection(self):
+        """Test that listen_and_transcribe detects channel hangup"""
+        # Setup mocks - channel no longer exists
+        self.mock_ari.get_channel_state = Mock(return_value=None)
+        self.mock_ari.stop_recording = Mock()
+        
+        with patch('time.sleep'):
+            result = self.handler.listen_and_transcribe(
+                'channel-123',
+                'test_recording',
+                timeout=1
+            )
+            
+            # Should return None when channel is gone
+            self.assertIsNone(result)
+            # stop_recording should NOT be called
+            self.mock_ari.stop_recording.assert_not_called()
+            
+    def test_listen_and_transcribe_stop_recording_error_handling(self):
+        """Test that listen_and_transcribe handles stop_recording errors gracefully"""
+        # Setup mocks
+        self.mock_ari.get_channel_state = Mock(return_value={'id': 'channel-123', 'state': 'Up'})
+        self.mock_ari.stop_recording = Mock(side_effect=Exception("Recording already stopped"))
+        self.mock_stt.transcribe_file = Mock(return_value="Test transcription")
+        
+        with patch('os.path.exists', return_value=True):
+            with patch('time.sleep'):
+                result = self.handler.listen_and_transcribe(
+                    'channel-123',
+                    'test_recording',
+                    timeout=1
+                )
+                
+                # Should continue gracefully despite stop_recording error
+                self.assertEqual(result, "Test transcription")
+                
+    def test_listen_and_transcribe_missing_recording_file(self):
+        """Test that listen_and_transcribe returns None when recording file is missing"""
+        # Setup mocks
+        self.mock_ari.get_channel_state = Mock(return_value={'id': 'channel-123', 'state': 'Up'})
+        self.mock_ari.stop_recording = Mock(return_value=True)
+        
+        with patch('os.path.exists', return_value=False):
+            with patch('time.sleep'):
+                result = self.handler.listen_and_transcribe(
+                    'channel-123',
+                    'test_recording',
+                    timeout=1
+                )
+                
+                # Should return None when file doesn't exist
+                self.assertIsNone(result)
+        
 
 class TestFullDuplexIntegration(unittest.TestCase):
     """Integration tests for full-duplex call handling"""
@@ -221,14 +295,16 @@ class TestFullDuplexIntegration(unittest.TestCase):
         # Create real config
         self.config = TelephonyConfig()
         
-        # Create handler
-        self.handler = FullDuplexHandler(
-            stt_engine=self.mock_stt,
-            tts_engine=self.mock_tts,
-            conversation_engine=self.mock_conversation,
-            ari_client=self.mock_ari,
-            config=self.config
-        )
+        # Mock directory creation to avoid permission errors in tests
+        with patch('os.makedirs'):
+            # Create handler
+            self.handler = FullDuplexHandler(
+                stt_engine=self.mock_stt,
+                tts_engine=self.mock_tts,
+                conversation_engine=self.mock_conversation,
+                ari_client=self.mock_ari,
+                config=self.config
+            )
         
     def test_full_call_flow_extension_1000(self):
         """Test complete call flow for extension 1000"""
@@ -257,6 +333,64 @@ class TestFullDuplexIntegration(unittest.TestCase):
         """Test complete call flow for extension 999 (TTS-only)"""
         # This should fall back to TTS-only mode
         self.assertFalse(self.handler.is_extension_in_range('999'))
+        
+    def test_handle_full_duplex_call_start_recording_failure_with_hangup(self):
+        """Test that handle_full_duplex_call detects hangup when start_recording fails"""
+        # Setup mocks
+        self.mock_conversation.get_response = Mock(return_value="Guten Tag!")
+        self.mock_tts.synthesize = Mock(return_value=True)
+        
+        # start_recording returns None (failure), channel is gone
+        self.mock_ari.start_recording = Mock(return_value=None)
+        self.mock_ari.get_channel_state = Mock(return_value=None)
+        self.mock_ari.play_media = Mock()
+        
+        with patch.object(self.handler, 'convert_audio_for_asterisk', return_value=True):
+            with patch('os.path.exists', return_value=True):
+                with patch('os.remove'):
+                    with patch('time.sleep'):
+                        conversation_history = []
+                        
+                        # Should exit cleanly without error
+                        self.handler.handle_full_duplex_call('channel-123', '1000', conversation_history)
+                        
+                        # Verify start_recording was called
+                        self.mock_ari.start_recording.assert_called()
+                        # Verify channel state was checked after recording failure
+                        self.mock_ari.get_channel_state.assert_called()
+                        
+    def test_handle_full_duplex_call_hangup_during_listening(self):
+        """Test that handle_full_duplex_call detects hangup during listen_and_transcribe"""
+        # Setup mocks
+        self.mock_conversation.get_response = Mock(return_value="Guten Tag!")
+        self.mock_tts.synthesize = Mock(return_value=True)
+        
+        # Recording starts successfully
+        self.mock_ari.start_recording = Mock(return_value={'name': 'test_recording'})
+        
+        # Channel state check sequence: alive during first check, gone during second
+        self.mock_ari.get_channel_state = Mock(side_effect=[
+            {'id': 'channel-123', 'state': 'Up'},  # Initial check in listen_and_transcribe
+            None  # Channel gone after listen_and_transcribe returns None
+        ])
+        
+        self.mock_ari.stop_recording = Mock(return_value=True)
+        self.mock_ari.play_media = Mock()
+        self.mock_stt.transcribe_file = Mock(return_value=None)
+        
+        with patch.object(self.handler, 'convert_audio_for_asterisk', return_value=True):
+            with patch('os.path.exists', return_value=False):  # No recording file
+                with patch('os.remove'):
+                    with patch('time.sleep'):
+                        conversation_history = []
+                        
+                        # Should exit cleanly after detecting hangup
+                        self.handler.handle_full_duplex_call('channel-123', '1000', conversation_history)
+                        
+                        # Verify the dialogue loop was entered and exited
+                        self.mock_ari.start_recording.assert_called()
+                        # Channel state should be checked when listen_and_transcribe returns None
+                        self.assertEqual(self.mock_ari.get_channel_state.call_count, 2)
         
 
 def run_tests():

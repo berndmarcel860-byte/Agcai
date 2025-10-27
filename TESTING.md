@@ -1,6 +1,52 @@
-# Manual Testing Guide for AI Call Agent
+# Testing Guide for AI Call Agent
 
-This guide explains how to test the AI Call Agent manually by calling extension 5000 from extension 1000 before running full campaigns.
+This guide covers testing approaches for the AI Call Agent system.
+
+## Quick Test: Lightweight Inbound Agent (No Infrastructure Required)
+
+For quick testing of inbound agent behavior **without** Asterisk, OpenAI, or other infrastructure:
+
+### Run the Lightweight Test Server
+
+```bash
+# Using the run script (recommended)
+./scripts/run_test_inbound.sh
+
+# Or directly
+python3 tests/test_inbound_real_conversation.py
+```
+
+### Test with a Client
+
+**Option 1: Built-in Python Client**
+```bash
+python3 tests/test_inbound_real_conversation.py --client
+```
+
+**Option 2: websocat (if installed)**
+```bash
+websocat ws://localhost:8765
+```
+
+**Option 3: wscat (if installed)**
+```bash
+wscat -c ws://localhost:8765
+```
+
+See `tests/README_INBOUND_TEST.md` for detailed instructions and testing scenarios.
+
+**Benefits:**
+- ✅ No external dependencies (only Python + websockets)
+- ✅ Runs on localhost (secure)
+- ✅ Clear console logging
+- ✅ Fast iteration for testing conversation flows
+- ✅ Automated tests included
+
+---
+
+## Full Manual Testing with Asterisk
+
+This section explains how to test the AI Call Agent manually by calling extension 5000 from extension 1000 before running full campaigns.
 
 ## Prerequisites
 

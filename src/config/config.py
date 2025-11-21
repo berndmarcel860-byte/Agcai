@@ -43,6 +43,7 @@ class TTSConfig:
     """Text-to-Speech configuration"""
     model: str
     language: str
+    use_gpu: bool = False
 
 
 @dataclass
@@ -50,6 +51,7 @@ class STTConfig:
     """Speech-to-Text configuration"""
     model: str
     language: str
+    device: str = "cpu"
 
 
 @dataclass
@@ -101,13 +103,15 @@ class Config:
         # TTS configuration
         self.tts = TTSConfig(
             model=os.getenv("TTS_MODEL", "tts_models/de/thorsten/tacotron2-DDC"),
-            language=os.getenv("TTS_LANGUAGE", "de")
+            language=os.getenv("TTS_LANGUAGE", "de"),
+            use_gpu=os.getenv("TTS_USE_GPU", "true").lower() == "true"
         )
         
         # STT configuration
         self.stt = STTConfig(
             model=os.getenv("WHISPER_MODEL", "base"),
-            language=os.getenv("WHISPER_LANGUAGE", "de")
+            language=os.getenv("WHISPER_LANGUAGE", "de"),
+            device=os.getenv("WHISPER_DEVICE", "cuda")
         )
         
         # Campaign configuration

@@ -10,23 +10,25 @@ from typing import Optional
 class TextToSpeech:
     """Text-to-Speech processor using Coqui TTS"""
     
-    def __init__(self, model_name: str = "tts_models/de/thorsten/tacotron2-DDC", language: str = "de"):
+    def __init__(self, model_name: str = "tts_models/de/thorsten/tacotron2-DDC", language: str = "de", use_gpu: bool = False):
         """
         Initialize Coqui TTS model
         
         Args:
             model_name: TTS model name
             language: Language code
+            use_gpu: Whether to use GPU acceleration
         """
         self.model_name = model_name
         self.language = language
+        self.use_gpu = use_gpu
         self.tts = None
         
     def load_model(self):
         """Load TTS model"""
         try:
-            logger.info(f"Loading Coqui TTS model: {self.model_name}")
-            self.tts = TTS(model_name=self.model_name, progress_bar=False)
+            logger.info(f"Loading Coqui TTS model: {self.model_name} (GPU: {self.use_gpu})")
+            self.tts = TTS(model_name=self.model_name, progress_bar=False, gpu=self.use_gpu)
             logger.info("Coqui TTS model loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load TTS model: {e}")
